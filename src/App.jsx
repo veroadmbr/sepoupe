@@ -1447,6 +1447,7 @@ function Dashboard({user,onLogout,isFirstVisit=false,plan="free",onPlanUpgrade})
   const [bankSelected,setBankSelected]       = useState(null);
   const [bankDailyDate,setBankDailyDate]     = useState(new Date().toISOString().slice(0,10));
   const [bankImportSel,setBankImportSel]     = useState({});
+  const [bankError,setBankError]             = useState(null);
   const [showUploadModal,setShowUploadModal] = useState(false);
   const [goals,setGoals]                 = useState([]);
   const [newGoalName,setNewGoalName]     = useState("");
@@ -3032,8 +3033,6 @@ Responda APENAS com JSON válido sem markdown:
           const isToday = bankDailyDate===new Date().toISOString().slice(0,10);
 
           // ── Pluggy Widget integration ──────────────────────────────
-          const [bankError,setBankError] = React.useState(null);
-
           const pluggyConnect = async () => {
             setBankError(null);
             setBankStep("syncing");
