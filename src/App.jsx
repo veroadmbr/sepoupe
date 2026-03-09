@@ -3031,12 +3031,89 @@ Responda APENAS com JSON válido sem markdown:
           const fmtDate=(s)=>{const d=new Date(s+"T12:00:00");return d.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});};
           const isToday = bankDailyDate===new Date().toISOString().slice(0,10);
 
-          const simulateSync=()=>{
+          // ── Pluggy Widget integration ──────────────────────────────
+          const [bankError,setBankError] = React.useState(null);
+
+          const pluggyConnect = async () => {
+            setBankError(null);
             setBankStep("syncing");
-            setTimeout(()=>{
-              setBankConnections(prev=>[...prev,{id:Date.now(),bank:bankSelected,lastSync:new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}),status:"active"}]);
-              setBankStep("done");
-            },2800);
+
+            try {
+              // 1. Get a short-lived connect token from our backend
+              const tokenRes = await fetch("/api/pluggy-token", { method:"POST" });
+              if (!tokenRes.ok) throw new Error("Não foi possível iniciar a conexão. Verifique as configurações do servidor.");
+              const { accessToken } = await tokenRes.json();
+
+              // 2. Load Pluggy Widget script dynamically
+              await new Promise((resolve, reject) => {
+                if (window.PluggyConnect) { resolve(); return; }
+                const s = document.createElement("script");
+                s.src = "https://cdn.pluggy.ai/pluggy-connect/v2/pluggy-connect.js";
+                s.onload = resolve;
+                s.onerror = () => reject(new Error("Não foi possível carregar o widget do Pluggy."));
+                document.head.appendChild(s);
+              });
+
+              // 3. Open Pluggy Widget
+              setBankStep(null); // hide syncing while widget is open
+              const pluggy = new window.PluggyConnect({
+                connectToken: accessToken,
+                // Optional: pre-select the bank the user clicked
+                // connectorId: bankSelected?.pluggyId,
+                onSuccess: async (itemData) => {
+                  setBankStep("syncing");
+                  try {
+                    // 4. Sync transactions via our backend
+                    const syncRes = await fetch("/api/pluggy-sync", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ itemId: itemData.item.id }),
+                    });
+                    if (!syncRes.ok) throw new Error("Erro ao sincronizar transações.");
+                    const syncData = await syncRes.json();
+
+                    // 5. Map to our txn format and save to state
+                    setBankTxns(prev => {
+                      // Remove old txns from same item to avoid duplicates
+                      const filtered = prev.filter(t => t.itemId !== itemData.item.id);
+                      const newTxns = syncData.transactions.map(t => ({ ...t, itemId: itemData.item.id }));
+                      return [...filtered, ...newTxns];
+                    });
+
+                    setBankConnections(prev => {
+                      const existing = prev.find(c => c.itemId === itemData.item.id);
+                      if (existing) return prev;
+                      return [...prev, {
+                        id: Date.now(),
+                        itemId: itemData.item.id,
+                        bank: bankSelected || { name: syncData.connectorName, id: syncData.connectorId },
+                        lastSync: new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}),
+                        status: "active",
+                        txnCount: syncData.count,
+                      }];
+                    });
+
+                    setBankStep("done");
+                  } catch (err) {
+                    setBankError(err.message);
+                    setBankStep("auth");
+                  }
+                },
+                onError: (err) => {
+                  setBankError(err?.message || "Erro ao conectar com o banco.");
+                  setBankStep("auth");
+                },
+                onClose: () => {
+                  // User closed widget without completing
+                  if (bankStep === null) setBankStep("auth");
+                },
+              });
+              pluggy.init();
+
+            } catch (err) {
+              setBankError(err.message);
+              setBankStep("auth");
+            }
           };
 
           return (
@@ -3124,15 +3201,20 @@ Responda APENAS com JSON válido sem markdown:
                         <div key={p} style={{fontSize:12,color:p.startsWith("❌")?C.textMid:C.text,marginBottom:6,fontWeight:p.startsWith("✅")?600:400}}>{p}</div>
                       ))}
                     </div>
-                    <div style={{fontSize:11,color:"#92400E",marginBottom:16,lineHeight:1.6,padding:"10px 14px",background:"#FFFBEB",borderRadius:9,border:"1px solid #FDE68A"}}>
-                      ℹ️ A integração real com o {bankSelected.name} requer a ativação da API <strong>Pluggy</strong> ou <strong>Belvo</strong> no backend. Após configurar a chave no servidor, as transações serão importadas automaticamente.
+                    <div style={{fontSize:11,color:"#1E3A5F",marginBottom:16,lineHeight:1.6,padding:"10px 14px",background:"#EEF5FF",borderRadius:9,border:"1px solid #BFDBFE"}}>
+                      🔒 Conexão segura via <strong>Open Banking</strong>. O Se Poupe só lê seus dados — nunca movimenta dinheiro ou acessa sua senha.
                     </div>
+                    {bankError&&(
+                      <div style={{fontSize:12,color:"#991B1B",marginBottom:12,padding:"10px 14px",background:"#FEF2F2",borderRadius:9,border:"1px solid #FECACA"}}>
+                        ⚠️ {bankError}
+                      </div>
+                    )}
                     <div style={{display:"flex",gap:10}}>
-                      <button onClick={()=>setBankStep("select")}
+                      <button onClick={()=>{setBankStep("select");setBankError(null);}}
                         style={{flex:1,background:C.bgSoft,border:`1px solid ${C.border}`,borderRadius:9,padding:"11px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit",color:C.textMid}}>Voltar</button>
-                      <button onClick={simulateSync}
+                      <button onClick={pluggyConnect}
                         style={{flex:2,background:bankSelected.color,color:"#fff",border:"none",borderRadius:9,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit",boxShadow:`0 2px 10px ${bankSelected.color}44`}}>
-                        🔒 Autorizar no {bankSelected.name}
+                        🔒 Conectar via Pluggy
                       </button>
                     </div>
                   </>)}
@@ -3140,12 +3222,17 @@ Responda APENAS com JSON válido sem markdown:
                   {/* Step: syncing */}
                   {bankStep==="syncing"&&(<>
                     <div style={{textAlign:"center",padding:"32px 0"}}>
-                      <div style={{fontSize:36,marginBottom:16}}>⟳</div>
-                      <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>Sincronizando transações...</div>
+                      <div style={{fontSize:36,marginBottom:16,display:"inline-block",animation:"spin .9s linear infinite"}}>⟳</div>
+                      <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>Importando transações...</div>
                       <div style={{fontSize:13,color:C.textMid,marginBottom:24}}>Buscando seus lançamentos dos últimos 90 dias</div>
-                      {["Autenticando com {bankSelected?.name}...","Lendo transações...","Classificando por categoria...","Concluindo..."].map((s,i)=>(
+                      {[
+                        `Conectando ao ${bankSelected?.name||"banco"}...`,
+                        "Lendo transações...",
+                        "Classificando por categoria...",
+                        "Finalizando importação...",
+                      ].map((s,i)=>(
                         <div key={i} style={{fontSize:12,color:C.textMid,marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                          <div style={{width:6,height:6,borderRadius:"50%",background:C.coral,animation:`pulse ${1+i*0.4}s ease infinite`,flexShrink:0}}/>{s.replace("{bankSelected?.name}",bankSelected?.name||"")}
+                          <div style={{width:6,height:6,borderRadius:"50%",background:C.coral,animation:`pulse ${1+i*0.4}s ease infinite`,flexShrink:0}}/>{s}
                         </div>
                       ))}
                     </div>
@@ -3159,7 +3246,11 @@ Responda APENAS com JSON válido sem markdown:
                   <div style={{fontSize:22}}>✅</div>
                   <div>
                     <div style={{fontWeight:700,fontSize:14,color:C.green}}>Banco conectado com sucesso!</div>
-                    <div style={{fontSize:12,color:C.textMid}}>Suas transações já estão disponíveis abaixo</div>
+                    <div style={{fontSize:12,color:C.textMid}}>
+                      {bankTxns.length > 0
+                        ? `${bankTxns.length} transações importadas dos últimos 90 dias`
+                        : "Nenhuma transação encontrada no período"}
+                    </div>
                   </div>
                   <button onClick={()=>{setBankStep(null);setBankConnecting(false);}} style={{marginLeft:"auto",background:"transparent",border:"none",cursor:"pointer",color:C.textMid,fontSize:18}}>×</button>
                 </div>
