@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import PluggyConnectSDK from "pluggy-connect-sdk";
 
 // ── Palette ─────────────────────────────────────────────────────────────────
 const C = {
@@ -3043,11 +3044,8 @@ Responda APENAS com JSON válido sem markdown:
               if (!tokenRes.ok) throw new Error("Não foi possível iniciar a conexão. Verifique as configurações do servidor.");
               const { accessToken } = await tokenRes.json();
 
-              // 2. Import Pluggy Connect SDK (installed via npm)
-              const { default: PluggyConnectSDK } = await import("pluggy-connect-sdk");
-
-              // 3. Open Pluggy Widget
-              setBankStep(null); // hide syncing while widget is open
+              // 2. Open Pluggy Widget (SDK imported statically at top of file)
+              setBankStep(null);
               const pluggy = new PluggyConnectSDK({
                 connectToken: accessToken,
                 // Optional: pre-select the bank the user clicked
