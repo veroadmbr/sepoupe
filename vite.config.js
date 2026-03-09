@@ -6,5 +6,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     chunkSizeWarningLimit: 1200,
+    commonjsOptions: {
+      include: [/pluggy-connect-sdk/, /node_modules/],
+    },
+  },
+  optimizeDeps: {
+    include: ['pluggy-connect-sdk'],
   },
 })
