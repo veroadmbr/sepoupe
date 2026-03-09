@@ -3012,17 +3012,7 @@ Responda APENAS com JSON válido sem markdown:
             {id:"inter",    name:"Inter",          color:"#FF7A00", bg:"#FFF4EB"},
             {id:"c6",       name:"C6 Bank",        color:"#1A1A1A", bg:"#F5F5F5"},
           ];
-          const DEMO_TXNS = [
-            {id:"t1",date:bankDailyDate,desc:"iFood",          amount:-45.90, category:"Alimentação",   account:"Nubank"},
-            {id:"t2",date:bankDailyDate,desc:"Posto Ipiranga", amount:-180.00,category:"Transporte",    account:"Nubank"},
-            {id:"t3",date:bankDailyDate,desc:"Farmácia São João",amount:-62.40,category:"Saúde",        account:"Itaú"},
-            {id:"t4",date:bankDailyDate,desc:"Pix recebido",   amount:+500.00, category:"Receita",      account:"Nubank"},
-            {id:"t5",date:bankDailyDate,desc:"Netflix",        amount:-55.90, category:"Lazer",         account:"Nubank"},
-            {id:"t6",date:bankDailyDate,desc:"Supermercado Extra",amount:-234.70,category:"Alimentação",account:"Itaú"},
-            {id:"t7",date:bankDailyDate,desc:"Uber",           amount:-23.50, category:"Transporte",    account:"Nubank"},
-            {id:"t8",date:bankDailyDate,desc:"Academia Smart Fit",amount:-109.90,category:"Saúde",      account:"Nubank"},
-          ];
-          const allTxns = bankTxns.length ? bankTxns : (bankConnections.length ? DEMO_TXNS : []);
+          const allTxns = bankTxns;
           const dayTxns = allTxns.filter(t=>t.date===bankDailyDate);
           const catMap = {};
           dayTxns.filter(t=>t.amount<0).forEach(t=>{
@@ -3045,7 +3035,6 @@ Responda APENAS com JSON válido sem markdown:
             setBankStep("syncing");
             setTimeout(()=>{
               setBankConnections(prev=>[...prev,{id:Date.now(),bank:bankSelected,lastSync:new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}),status:"active"}]);
-              setBankTxns(DEMO_TXNS);
               setBankStep("done");
             },2800);
           };
@@ -3135,8 +3124,8 @@ Responda APENAS com JSON válido sem markdown:
                         <div key={p} style={{fontSize:12,color:p.startsWith("❌")?C.textMid:C.text,marginBottom:6,fontWeight:p.startsWith("✅")?600:400}}>{p}</div>
                       ))}
                     </div>
-                    <div style={{fontSize:11,color:C.textLight,marginBottom:16,lineHeight:1.6,padding:"10px 14px",background:"#FFFBEB",borderRadius:9,border:"1px solid #FDE68A"}}>
-                      ⚠️ Em produção, você será redirecionado para o app do {bankSelected.name} para autenticar com sua biometria ou senha. Esta é uma demonstração do fluxo.
+                    <div style={{fontSize:11,color:"#92400E",marginBottom:16,lineHeight:1.6,padding:"10px 14px",background:"#FFFBEB",borderRadius:9,border:"1px solid #FDE68A"}}>
+                      ℹ️ A integração real com o {bankSelected.name} requer a ativação da API <strong>Pluggy</strong> ou <strong>Belvo</strong> no backend. Após configurar a chave no servidor, as transações serão importadas automaticamente.
                     </div>
                     <div style={{display:"flex",gap:10}}>
                       <button onClick={()=>setBankStep("select")}
