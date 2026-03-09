@@ -3043,19 +3043,20 @@ Responda APENAS com JSON válido sem markdown:
               if (!tokenRes.ok) throw new Error("Não foi possível iniciar a conexão. Verifique as configurações do servidor.");
               const { accessToken } = await tokenRes.json();
 
-              // 2. Load Pluggy Widget script dynamically
+              // 2. Load Pluggy Connect SDK dynamically
               await new Promise((resolve, reject) => {
                 if (window.PluggyConnect) { resolve(); return; }
                 const s = document.createElement("script");
-                s.src = "https://cdn.pluggy.ai/pluggy-connect/v2/pluggy-connect.js";
-                s.onload = resolve;
+                s.src = "https://cdn.jsdelivr.net/npm/pluggy-connect-sdk@latest/dist/pluggy-connect.min.js";
+                s.onload = () => { resolve(); };
                 s.onerror = () => reject(new Error("Não foi possível carregar o widget do Pluggy."));
                 document.head.appendChild(s);
               });
 
               // 3. Open Pluggy Widget
               setBankStep(null); // hide syncing while widget is open
-              const pluggy = new window.PluggyConnect({
+              const PluggyConnectClass = window.PluggyConnect?.default || window.PluggyConnect;
+              const pluggy = new PluggyConnectClass({
                 connectToken: accessToken,
                 // Optional: pre-select the bank the user clicked
                 // connectorId: bankSelected?.pluggyId,
